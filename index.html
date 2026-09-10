@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<!-- ↑ 这一行告诉浏览器：这是 HTML5 文档。所有网页都必须以它开头。 -->
+
+<!-- lang="zh-CN" 声明页面语言是中文，方便浏览器和搜索引擎正确处理 -->
+<html lang="zh-CN">
+<head>
+  <!-- head 里的三件事：字符编码、手机适配、网页标题 -->
+  <meta charset="UTF-8">
+  <!-- ↑ 必须写，否则中文可能变成乱码 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- ↑ 必须写，否则手机上打开会缩得很小 -->
+  <title>郑晓宇的个人主页</title>
+  <!-- ↑ 浏览器标签页上显示的文字，换成你自己的名字 -->
+
+  <style>
+    /* ============ 下面这一段是 CSS，负责“长什么样” ============
+       规则格式：  选择器 { 属性: 值; }
+       .card 这种带点的叫“类选择器”，对应 HTML 里 class="card" 的元素 */
+
+    /* :root 里定义的是“变量”，下面用 var(--名字) 引用，
+       好处是以后想换配色，只改这里一处就行 */
+    :root {
+      --bg: #eef2f7;          /* 页面背景色 */
+      --card-bg: #ffffff;     /* 卡片背景色 */
+      --text: #1f2937;        /* 正文颜色 */
+      --muted: #6b7280;       /* 次要文字颜色 */
+      --accent: #2563eb;      /* 主色调，用在标题、按钮、链接上 */
+    }
+
+    /* 让内边距和边框算进元素宽度里，避免布局“算不准” */
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;                     /* 去掉浏览器默认的外边距 */
+      min-height: 100vh;             /* 至少占满一屏高度 */
+      display: flex;                 /* 用弹性布局，方便把卡片居中 */
+      align-items: center;           /* 垂直居中 */
+      justify-content: center;       /* 水平居中 */
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, "Microsoft YaHei", "PingFang SC", sans-serif;
+      line-height: 1.7;              /* 行高，1.7 倍阅读最舒服 */
+    }
+
+    /* 卡片本体：整个页面的内容都装在这个盒子里 */
+    .card {
+      width: min(680px, 92vw);       /* 宽屏最多 680px，窄屏最多占 92% 宽 */
+      background: var(--card-bg);
+      border-radius: 16px;           /* 圆角 */
+      padding: 40px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);  /* 阴影，让卡片“浮”起来 */
+    }
+
+    /* 头像：直接用证件照，裁成圆形。
+       object-fit: cover 是这里的关键——它按比例裁剪填满圆框，
+       照片不会被拉扁或拉长（不加它，证件照会变形成一团） */
+    .avatar {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;            /* 50% 就是正圆，改成 12px 则变成圆角方图 */
+      object-fit: cover;             /* 按比例裁剪填满，不变形 */
+      object-position: center top;   /* 裁剪时优先保留上方的头部 */
+      border: 3px solid #fff;        /* 白色描边，让圆边更干净 */
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.15);
+      background: #dbeafe;           /* 图片加载失败时的兜底底色 */
+      display: block;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0 0 6px;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      margin: 0 0 24px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    h2 {
+      margin: 28px 0 10px;
+      font-size: 18px;
+      color: var(--accent);
+      border-left: 4px solid var(--accent);  /* 左侧小竖条，做视觉分隔 */
+      padding-left: 10px;
+    }
+
+    p { margin: 0 0 12px; }
+
+    /* 兴趣标签：一排小圆角方块 */
+    .tags { display: flex; flex-wrap: wrap; gap: 8px; padding: 0; margin: 0; list-style: none; }
+    .tags li {
+      background: #eff6ff;
+      color: var(--accent);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+    }
+
+    /* 链接列表 */
+    .links { list-style: none; padding: 0; margin: 0; }
+    .links li { margin-bottom: 8px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }   /* 鼠标悬停时才出现下划线 */
+
+    /* 邮箱旁边的“复制”小按钮 */
+    .copy-btn {
+      margin-left: 6px;
+      padding: 2px 10px;
+      font-size: 12px;
+      font-family: inherit;        /* 按钮默认不继承页面字体，要显式声明 */
+      color: var(--accent);
+      background: #eff6ff;
+      border: 1px solid #c7dbff;
+      border-radius: 999px;        /* 够大的圆角 = 胶囊形 */
+      cursor: pointer;             /* 鼠标移上去变成小手 */
+    }
+    .copy-btn:hover { background: #dbeafe; }
+
+    .footer {
+      margin-top: 32px;
+      padding-top: 16px;
+      border-top: 1px solid #e5e7eb;   /* 一条分隔线 */
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    /* 履历时间线：左边一条竖线，每一项前面一个小圆点 */
+    .timeline { list-style: none; margin: 0; padding: 0; }
+    .timeline > li {
+      position: relative;              /* 让下面圆点的绝对定位以本项为基准 */
+      border-left: 2px solid #e5e7eb;  /* 这条就是时间线的竖线 */
+      margin-left: 5px;
+      padding: 0 0 18px 22px;
+    }
+    /* :last-child 指最后一项：把它的竖线设为透明，线就自然收尾了 */
+    .timeline > li:last-child { border-left-color: transparent; padding-bottom: 0; }
+    /* ::before 叫“伪元素”，这里用它画出时间线上的小圆点，不用额外写标签 */
+    .timeline > li::before {
+      content: "";                     /* 伪元素必须写 content，内容留空即可 */
+      position: absolute;
+      left: -8px;                      /* 往左挪一点，正好压在竖线上 */
+      top: 7px;
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: var(--accent);
+    }
+    .timeline .date { display: block; color: var(--muted); font-size: 13px; line-height: 1.4; }
+    .timeline .note { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
+
+    /* 媒体查询：当屏幕宽度小于 560px（手机）时，采用下面这套更紧凑的样式 */
+    @media (max-width: 560px) {
+      .card { padding: 24px; }
+      h1 { font-size: 23px; }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- body 里是“有什么内容”，每一块都用语义标签包起来：
+       main = 主体内容，section = 一个区块，h2 = 区块标题，ul/li = 列表 -->
+  <main class="card">
+
+    <!-- ========== ① 头部：头像 + 名字 + 一句话介绍 ========== -->
+    <!-- img 是“图片”标签，必须写 src（图片路径）和 alt（图片加载失败时显示的说明）。
+         路径 images/avatar.jpg 是“相对路径”：表示和 index.html 同级的 images 文件夹。
+         所以 images 文件夹必须和 index.html 放在一起、一起上传到仓库，否则头像会显示不出来 -->
+    <img class="avatar" src="images/avatar.jpg" alt="郑晓宇的证件照">
+    <h1>郑晓宇</h1>
+    <p class="subtitle">广东工业大学 · 集成电路设计与集成系统 · 2026 级</p>
+
+    <!-- ========== ② 自我介绍 ========== -->
+    <section>
+      <h2>关于我</h2>
+      <p>
+        我是广东工业大学集成电路学院的大一新生。刚接触编程不久，目前在学习 C 语言和网页基础，
+        尝试借助 AI 工具把想法变成能跑起来的东西。这个主页是我第一次用 HTML/CSS 写的页面。
+      </p>
+    </section>
+
+    <!-- ========== ③ 履历与获奖：时间线 ========== -->
+    <section>
+      <h2>履历与获奖</h2>
+      <ul class="timeline">
+        <li>
+          <span class="date">2025.10</span>
+          第 39 届中国化学奥林匹克（初赛）二等奖
+          <p class="note">中国化学会 · 证书编号 CE2506356</p>
+        </li>
+        <li>
+          <span class="date">2024.10</span>
+          第 38 届中国化学奥林匹克（初赛）二等奖
+          <p class="note">中国化学会 · 证书编号 CE2406352</p>
+        </li>
+      </ul>
+    </section>
+
+    <!-- ========== ④ 兴趣：用列表做标签 ========== -->
+    <section>
+      <h2>兴趣</h2>
+      <ul class="tags">
+        <li>化学</li>
+        <li>跑步</li>
+        <li>吉他</li>
+        <li>乒乓球</li>
+        <li>科幻小说</li>
+      </ul>
+    </section>
+
+    <!-- ========== ⑤ 联系方式 ========== -->
+    <section>
+      <h2>联系方式</h2>
+      <ul class="links">
+        <li>
+          邮箱：<a id="mail" href="mailto:kot0r1@163.com">kot0r1@163.com</a>
+          <!-- type="button" 表示这是普通按钮（不是提交表单那种）；
+               onclick 里的 copyMail(this) 表示点击时执行下面那段 JavaScript -->
+          <button class="copy-btn" type="button" onclick="copyMail(this)">复制</button>
+        </li>
+        <!-- mailto: 是固定写法，点一下会调用系统里的“默认邮件应用”。
+             如果电脑没设默认邮件应用，浏览器就只能打开一个空白页——
+             这不是网页写错了，所以旁边留了“复制”按钮兜底 -->
+        <li>GitHub：<a href="https://github.com/Kot0r11">github.com/Kot0r11</a></li>
+        <li>微信：Kot0r1_103176</li>
+        <li>QQ：3061189130</li>
+      </ul>
+    </section>
+
+    <p class="footer">© 2026 郑晓宇 · 使用 HTML/CSS 手写 · 托管于 GitHub Pages</p>
+  </main>
+
+  <!-- ========== 一点 JavaScript：让“复制”按钮真的能把邮箱复制到剪贴板 ==========
+       script 标签放在 body 结束之前，是为了保证执行时上面的元素已经加载出来了 -->
+  <script>
+    function copyMail(btn) {
+      // textContent 取到的是链接里显示的文字，trim() 去掉首尾空格
+      var addr = document.getElementById('mail').textContent.trim();
+
+      // 复制成功后把按钮文字临时改成“已复制”，1.5 秒后变回来，给用户一个反馈
+      function done() {
+        btn.textContent = '已复制';
+        setTimeout(function () { btn.textContent = '复制'; }, 1500);
+      }
+
+      // 备用办法：造一个隐藏输入框，选中文字后执行复制命令（老浏览器用）
+      function fallback() {
+        var ta = document.createElement('textarea');
+        ta.value = addr;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        done();
+      }
+
+      // clipboard 接口只在安全环境下可用；GitHub Pages 是 https，满足条件
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(addr).then(done).catch(fallback);
+      } else {
+        fallback();
+      }
+    }
+  </script>
+</body>
+</html>
