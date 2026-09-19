@@ -1,0 +1,1587 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="classic">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>扫雷 Minesweeper</title>
+<style>
+  /* ============ 主题变量：换主题只改这一组值 ============ */
+  :root {
+    --cell: 26px;                 /* 每个格子的边长 */
+  }
+  /* 经典主题：模仿 Windows 自带扫雷的灰色立体面板 */
+  [data-theme="classic"] {
+    --page-bg:     #f3f3f3;
+    --text:        #1a1a1a;
+    --muted:       #666666;
+    --frame:       #c0c0c0;      /* 经典灰 */
+    --frame-light: #ffffff;      /* 立体边框的亮面 */
+    --frame-dark:  #7b7b7b;      /* 立体边框的暗面 */
+    --cell-up:     #c0c0c0;      /* 未翻开的格子 */
+    --cell-down:   #c0c0c0;      /* 已翻开的格子 */
+    --cell-line:   #b0b0b0;
+    --board-bg:    #c0c0c0;
+    --hud-bg:      #000000;      /* 计数器底色 */
+    --hud-text:    #ff3b30;      /* LED 红字 */
+    --panel:       #ffffff;
+    --accent:      #2563eb;
+    --n1:#0000ff; --n2:#008000; --n3:#ff0000; --n4:#000080;
+    --n5:#800000; --n6:#008080; --n7:#000000; --n8:#808080;
+  }
+  /* 深色主题：同一套布局，只换配色 */
+  [data-theme="dark"] {
+    --page-bg:     #16181d;
+    --text:        #e8eaed;
+    --muted:       #9aa0a6;
+    --frame:       #2b2f36;
+    --frame-light: #454b55;
+    --frame-dark:  #14171b;
+    --cell-up:     #3a4048;
+    --cell-down:   #23272e;
+    --cell-line:   #2b2f36;
+    --board-bg:    #2b2f36;
+    --hud-bg:      #0d0f12;
+    --hud-text:    #ff5c52;
+    --panel:       #1e2228;
+    --accent:      #5b9dff;
+    --n1:#7fb2ff; --n2:#6fd08c; --n3:#ff7b72; --n4:#b39ddb;
+    --n5:#e6a17a; --n6:#6fd3d3; --n7:#d0d0d0; --n8:#9aa0a6;
+  }
+  /* 角色主题：具体的颜色由 JavaScript 按角色官方色实时算出来写进内联变量，
+     这里只提供文字、数字等不随角色变化的基准色 */
+  [data-theme="char"] {
+    --text:        #1a1a1a;
+    --muted:       #5b5b5b;
+    --hud-bg:      #000000;
+    --panel:       #ffffff;
+    --n1:#0000ff; --n2:#008000; --n3:#ff0000; --n4:#000080;
+    --n5:#800000; --n6:#008080; --n7:#000000; --n8:#808080;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 20px 12px 40px;
+    background: var(--page-bg);
+    color: var(--text);
+    font-family: system-ui, "Microsoft YaHei", "PingFang SC", sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+    -webkit-tap-highlight-color: transparent;
+  }
+  /* 卡面图片作为整页背景：叠一层半透明黑，保证棋盘始终看得清 */
+  body.has-photo {
+    background-image: linear-gradient(rgba(0, 0, 0, .30), rgba(0, 0, 0, .30)), var(--photo);
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
+  }
+  h1 { font-size: 20px; margin: 0; letter-spacing: 2px; }
+
+  /* ---------- 顶部按钮栏 ---------- */
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+  button {
+    font-family: inherit;
+    font-size: 13px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--frame-dark);
+    border-radius: 6px;
+    padding: 6px 12px;
+    cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  button.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+  button.primary:hover { color: #fff; opacity: .88; }
+
+  /* ---------- 经典立体面板 ---------- */
+  .panel {
+    background: var(--frame);
+    padding: 8px;
+    /* 外凸立体边框：左上亮、右下暗，是 Windows 经典控件的画法 */
+    border-top: 3px solid var(--frame-light);
+    border-left: 3px solid var(--frame-light);
+    border-right: 3px solid var(--frame-dark);
+    border-bottom: 3px solid var(--frame-dark);
+  }
+  .hud {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 5px 6px;
+    background: var(--frame);
+    /* 内凹立体边框：和上面正好相反 */
+    border-top: 2px solid var(--frame-dark);
+    border-left: 2px solid var(--frame-dark);
+    border-right: 2px solid var(--frame-light);
+    border-bottom: 2px solid var(--frame-light);
+  }
+  .digit {
+    background: var(--hud-bg);
+    color: var(--hud-text);
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    padding: 1px 8px;
+    min-width: 62px;
+    text-align: center;
+  }
+  .face {
+    width: 38px; height: 38px;
+    padding: 0;
+    font-size: 20px;
+    line-height: 1;
+    background: var(--frame);
+    border-radius: 0;
+    border-top: 3px solid var(--frame-light);
+    border-left: 3px solid var(--frame-light);
+    border-right: 3px solid var(--frame-dark);
+    border-bottom: 3px solid var(--frame-dark);
+  }
+  .face:active {
+    border-top-color: var(--frame-dark);
+    border-left-color: var(--frame-dark);
+    border-right-color: var(--frame-light);
+    border-bottom-color: var(--frame-light);
+  }
+
+  /* ---------- 棋盘 ---------- */
+  .board {
+    display: grid;
+    gap: 0;
+    background: var(--board-bg);
+    border-top: 3px solid var(--frame-dark);
+    border-left: 3px solid var(--frame-dark);
+    border-right: 3px solid var(--frame-light);
+    border-bottom: 3px solid var(--frame-light);
+    user-select: none;
+    touch-action: manipulation;   /* 手机上不要弹出缩放 */
+  }
+  .cell {
+    width: var(--cell);
+    height: var(--cell);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: calc(var(--cell) * 0.62);
+    font-weight: 700;
+    line-height: 1;
+    cursor: pointer;
+    background: var(--cell-up);
+    /* 未翻开：外凸，看起来像可以按下去的小方块 */
+    border-top: 3px solid var(--frame-light);
+    border-left: 3px solid var(--frame-light);
+    border-right: 3px solid var(--frame-dark);
+    border-bottom: 3px solid var(--frame-dark);
+  }
+  .cell.down, .cell.mine, .cell.flag { cursor: default; }
+  .cell.down {
+    background: var(--cell-down);
+    /* 已翻开：变成平面，只留一条浅线区分格子 */
+    border: 1px solid var(--cell-line);
+    padding: 2px;
+  }
+  .cell.flag { font-size: calc(var(--cell) * 0.52); }
+  .cell.mine { background: var(--cell-down); border: 1px solid var(--cell-line); }
+  .cell.wrong { color: #c00; }
+  .cell.boom { background: #ff6b6b; border: 1px solid var(--cell-line); }
+  .n1{color:var(--n1)} .n2{color:var(--n2)} .n3{color:var(--n3)} .n4{color:var(--n4)}
+  .n5{color:var(--n5)} .n6{color:var(--n6)} .n7{color:var(--n7)} .n8{color:var(--n8)}
+
+  /* ---------- 统计区 ---------- */
+  .stats {
+    width: 100%;
+    max-width: 420px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+    gap: 8px;
+  }
+  .stat {
+    background: var(--panel);
+    border: 1px solid var(--frame-dark);
+    border-radius: 6px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .stat b { display: block; font-size: 16px; }
+  .stat span { font-size: 11px; color: var(--muted); }
+  .ai-box {
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--frame-dark);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.6;
+  }
+  .ai-box .ok { color: #12a150; font-weight: 700; }
+  .ai-box .why { color: var(--muted); font-size: 12px; }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; max-width: 420px; line-height: 1.7; }
+  .tip { min-height: 19px; font-size: 12px; color: var(--accent); text-align: center; max-width: 420px; line-height: 1.5; }
+
+  /* ---------- 角色主题面板 ---------- */
+  .theme-panel {
+    display: none;
+    width: 100%;
+    max-width: 420px;
+    background: var(--panel);
+    border: 1px solid var(--frame-dark);
+    border-radius: 8px;
+    padding: 10px 12px;
+  }
+  .theme-panel.open { display: block; }
+  .tp-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 14px; }
+  .tp-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin: 7px 0; }
+  .tp-label { font-size: 12px; color: var(--muted); }
+  .mini { font-size: 12px; padding: 4px 9px; border-radius: 6px; }
+  .tp-hint { font-size: 11px; color: var(--muted); line-height: 1.6; margin: 4px 0 8px; }
+  #char-list { max-height: 210px; overflow: auto; padding-right: 4px; }
+  .band-name { font-size: 11px; color: var(--muted); margin: 8px 0 4px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-family: inherit; font-size: 12px; padding: 3px 9px;
+    border-radius: 999px; border: 1px solid var(--frame-dark);
+    background: transparent; color: var(--text); cursor: pointer;
+  }
+  .chip .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  .chip.on { border-color: var(--accent); box-shadow: inset 0 0 0 2px var(--accent); }
+  .chip .x { opacity: .55; margin-left: 2px; font-size: 13px; }
+  /* 卡面选择条：横向滚动的一排缩略图 */
+  .cards { display: flex; gap: 6px; overflow-x: auto; padding: 4px 0 8px; min-height: 10px; }
+  .cards img {
+    width: 78px; height: 59px; object-fit: cover;
+    border-radius: 4px; border: 2px solid transparent;
+    cursor: pointer; flex: 0 0 auto; background: #e5e7eb;
+  }
+  .cards img.on { border-color: var(--accent); }
+  .cards img.bad { opacity: .25; }
+  /* 战绩列表 */
+  .hist-row {
+    display: flex; align-items: center; gap: 8px;
+    padding: 5px 0; border-bottom: 1px solid var(--frame-dark);
+    font-size: 12px;
+  }
+  .hist-row:last-child { border-bottom: none; }
+  .hist-no { width: 22px; color: var(--muted); text-align: right; }
+  .hist-res { width: 42px; font-weight: 700; }
+  .hist-res.win { color: #12a150; }
+  .hist-res.lose { color: #d9534f; }
+  .hist-meta { color: var(--muted); }
+  .ai-recent-win { color: #12a150; font-weight: 700; }
+  .ai-recent-lose { color: #d9534f; font-weight: 700; }
+  .theme-panel input[type="text"] {
+    font-family: inherit; font-size: 12px; padding: 4px 8px;
+    border-radius: 6px; border: 1px solid var(--frame-dark);
+    background: var(--panel); color: var(--text); flex: 1; min-width: 130px;
+  }
+  @media (max-width: 420px) { :root { --cell: 22px; } }
+</style>
+</head>
+<body>
+
+<h1>扫 雷</h1>
+
+<div class="toolbar">
+  <button id="btn-new" class="primary">新游戏</button>
+  <button id="btn-theme">🌙 深色主题</button>
+  <button id="btn-chars">🎨 角色主题</button>
+  <button id="btn-history">📋 战绩</button>
+  <button id="btn-ai">▶ AI 自动演示</button>
+  <button id="btn-reset">重置统计</button>
+</div>
+
+<div class="panel">
+  <div class="hud">
+    <div class="digit" id="mine-left">010</div>
+    <button class="face" id="btn-face" title="点一下开新局">🙂</button>
+    <div class="digit" id="timer">000</div>
+  </div>
+  <div class="board" id="board"></div>
+</div>
+
+<div class="stats" id="stats"></div>
+
+<div class="theme-panel" id="theme-panel">
+  <div class="tp-head">
+    <b>🎨 角色主题（BanG Dream!）</b>
+    <span>
+      <button class="mini" id="btn-rand">🎲 随机角色</button>
+      <button class="mini" id="btn-rand-card">🎲 随机卡面</button>
+    </span>
+  </div>
+
+  <div class="tp-row">
+    <span class="tp-label">卡面图片</span>
+    <input type="text" id="img-url" placeholder="粘贴卡面图片地址…">
+    <button class="mini" id="btn-img-apply">应用</button>
+  </div>
+  <div class="tp-row">
+    <span class="tp-label"></span>
+    <label class="chip" style="cursor:pointer">📁 选择本地图片<input type="file" id="img-file" accept="image/*" hidden></label>
+    <button class="mini" id="btn-img-clear">清除图片</button>
+  </div>
+  <div class="tp-row" style="margin-bottom:0">
+    <span class="tp-label">内置卡面</span>
+    <span class="tp-hint" id="card-hint" style="margin:0">先点下面任意一个角色，这里会列出 TA 的卡面。</span>
+  </div>
+  <div class="cards" id="card-list"></div>
+  <div class="tp-hint" id="img-hint">
+    卡面是官方版权素材，<b>不要</b>把图片文件提交到仓库；这里用链接或本地选择，图片只在你的浏览器里显示。
+    地址可以从 Bestdori 的资源浏览器里右键图片复制。
+  </div>
+
+  <div id="char-list"></div>
+
+  <div class="tp-row">
+    <span class="tp-label">我的主题</span>
+    <button class="mini" id="btn-save-theme">保存当前为主题</button>
+  </div>
+  <div class="chips" id="my-themes"></div>
+</div>
+
+<div class="theme-panel" id="history-panel">
+  <div class="tp-head">
+    <b>📋 最近 10 局战绩</b>
+    <button class="mini" id="btn-history-clear">清空记录</button>
+  </div>
+  <div id="history-list"></div>
+</div>
+
+<div class="ai-box">
+  <div id="ai-line">AI 演示：未开始</div>
+  <div class="why" id="ai-why">点击上面的「AI 自动演示」，它会自己推理并完成 9×9、10 雷的标准局。连胜只有踩雷才会中断，中途停下来再继续不算断，所以最长连胜可以一直累积。</div>
+  <div class="why" id="ai-recent"></div>
+</div>
+
+<p class="hint">
+  左键翻开 · 右键插旗 · 点已翻开的数字可快速展开周围 · 手机上长按插旗<br>
+  <b>点数字的规则</b>：它周围插的旗子数正好等于数字时，会一次展开其余格子；旗子不够时下方会给出提示<br>
+  第一次点击必定是安全区（连周围 8 格都不会有雷）<br>
+  得分规则：拿下本局得「1000 - 用时秒数 × 10」分（最低 0 分），踩雷不得分
+</p>
+
+<script>
+/* ==================== ENGINE_START ====================
+   这一段是纯游戏逻辑，完全不碰网页元素（DOM），
+   所以可以单独抽出来用 Node.js 批量跑随机局，验证 AI 的真实胜率。
+   ==================== */
+
+// 一个可复现的随机数生成器：同一个种子必定生成同一副雷区
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const DIRS = [[-1,-1],[0,-1],[1,-1],[-1,0],[1,0],[-1,1],[0,1],[1,1]];
+const at = (g, x, y) => y * g.cols + x;
+const inBoard = (g, x, y) => x >= 0 && y >= 0 && x < g.cols && y < g.rows;
+
+function around(g, x, y) {
+  const out = [];
+  for (const [dx, dy] of DIRS) {
+    const nx = x + dx, ny = y + dy;
+    if (inBoard(g, nx, ny)) out.push(at(g, nx, ny));
+  }
+  return out;
+}
+
+function newGame(cols, rows, mines, rand) {
+  const cells = [];
+  for (let i = 0; i < cols * rows; i++) {
+    cells.push({ mine: false, revealed: false, flagged: false, adj: 0 });
+  }
+  return {
+    cols, rows, mines, cells,
+    status: 'ready',        // ready 未开局 / playing 进行中 / won 胜 / lost 负
+    placed: false,          // 雷是否已经放下（第一下点击时才放）
+    revealedCount: 0,
+    flagCount: 0,
+    rand: rand || Math.random
+  };
+}
+
+// 第一下点击之后才布雷，且保证点击处及周围 3x3 都没有雷
+function placeMines(g, safeX, safeY) {
+  const banned = new Set();
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (inBoard(g, safeX + dx, safeY + dy)) banned.add(at(g, safeX + dx, safeY + dy));
+    }
+  }
+  const pool = [];
+  for (let i = 0; i < g.cells.length; i++) if (!banned.has(i)) pool.push(i);
+  // 洗牌，然后取前 mines 个位置埋雷
+  for (let i = pool.length - 1; i > 0; i--) {
+    const j = Math.floor(g.rand() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  for (let i = 0; i < g.mines && i < pool.length; i++) g.cells[pool[i]].mine = true;
+  // 算出每个格子周围有几颗雷
+  for (let y = 0; y < g.rows; y++) {
+    for (let x = 0; x < g.cols; x++) {
+      const c = g.cells[at(g, x, y)];
+      if (c.mine) continue;
+      let n = 0;
+      for (const k of around(g, x, y)) if (g.cells[k].mine) n++;
+      c.adj = n;
+    }
+  }
+  g.placed = true;
+}
+
+function reveal(g, x, y) {
+  if (g.status === 'won' || g.status === 'lost') return false;
+  const i = at(g, x, y);
+  const cell = g.cells[i];
+  if (cell.revealed || cell.flagged) return false;
+  if (!g.placed) { placeMines(g, x, y); g.status = 'playing'; }
+  if (cell.mine) {                       // 踩雷，本局结束
+    cell.revealed = true;
+    g.status = 'lost';
+    for (const c of g.cells) if (c.mine) c.revealed = true;
+    return true;
+  }
+  // 成片展开：用栈代替递归，避免大棋盘递归过深
+  const stack = [i];
+  while (stack.length) {
+    const k = stack.pop();
+    const c = g.cells[k];
+    if (c.revealed || c.flagged) continue;
+    c.revealed = true;
+    g.revealedCount++;
+    if (c.adj === 0) {                   // 周围没雷，就把邻居也翻开
+      const x2 = k % g.cols, y2 = (k / g.cols) | 0;
+      for (const n of around(g, x2, y2)) {
+        if (!g.cells[n].revealed && !g.cells[n].flagged) stack.push(n);
+      }
+    }
+  }
+  if (g.revealedCount === g.cols * g.rows - g.mines) {
+    g.status = 'won';
+    // 通关后把还没插旗的雷自动插上旗，一眼就能看到雷的位置（经典扫雷也是这个行为）
+    for (const c of g.cells) {
+      if (c.mine && !c.flagged) { c.flagged = true; g.flagCount++; }
+    }
+  }
+  return true;
+}
+
+function toggleFlag(g, x, y) {
+  if (g.status === 'won' || g.status === 'lost') return false;
+  const c = g.cells[at(g, x, y)];
+  if (c.revealed) return false;
+  c.flagged = !c.flagged;
+  g.flagCount += c.flagged ? 1 : -1;
+  return true;
+}
+
+// 快速展开：已翻开的数字，周围旗子数正好等于数字时，翻开其余邻居
+function chord(g, x, y) {
+  if (g.status === 'won' || g.status === 'lost') return false;
+  const c = g.cells[at(g, x, y)];
+  if (!c.revealed || c.adj === 0) return false;
+  const nb = around(g, x, y);
+  let flags = 0;
+  for (const k of nb) if (g.cells[k].flagged) flags++;
+  if (flags !== c.adj) return false;
+  let acted = false;
+  for (const k of nb) {
+    if (!g.cells[k].revealed && !g.cells[k].flagged) {
+      reveal(g, k % g.cols, (k / g.cols) | 0);
+      acted = true;
+    }
+  }
+  return acted;
+}
+
+/* ---------- AI 部分：先靠推理，实在推不出来才猜 ---------- */
+
+// 把每个数字格子变成一条"约束"：这些未知格里，有恰好 need 颗雷
+function buildConstraints(g) {
+  const cons = [];
+  for (let y = 0; y < g.rows; y++) {
+    for (let x = 0; x < g.cols; x++) {
+      const c = g.cells[at(g, x, y)];
+      if (!c.revealed || c.adj === 0) continue;
+      const hidden = [];
+      let flags = 0;
+      for (const k of around(g, x, y)) {
+        const n = g.cells[k];
+        if (n.flagged) flags++;
+        else if (!n.revealed) hidden.push(k);
+      }
+      if (hidden.length) cons.push({ cells: hidden, need: c.adj - flags });
+    }
+  }
+  return cons;
+}
+
+// 基础规则：剩余格全是雷 / 剩余格全安全
+function basicDeduce(cons) {
+  const safe = new Set(), mine = new Set();
+  for (const c of cons) {
+    if (c.need <= 0) for (const i of c.cells) safe.add(i);
+    else if (c.need >= c.cells.length) for (const i of c.cells) mine.add(i);
+  }
+  return { safe: [...safe], mine: [...mine] };
+}
+
+// 进阶规则（子集规则）：如果 A 的未知格完全包含在 B 里，
+// 那么 B 比 A 多出来的那部分，雷数就是 needB - needA，往往能推出新结论
+function subsetDeduce(cons) {
+  const safe = new Set(), mine = new Set();
+  for (let a = 0; a < cons.length; a++) {
+    for (let b = 0; b < cons.length; b++) {
+      if (a === b) continue;
+      const A = cons[a], B = cons[b];
+      if (A.cells.length >= B.cells.length) continue;
+      const inB = new Set(B.cells);
+      if (!A.cells.every(i => inB.has(i))) continue;
+      const diff = B.cells.filter(i => !A.cells.includes(i));
+      const need = B.need - A.need;
+      if (need <= 0) for (const i of diff) safe.add(i);
+      else if (need >= diff.length) for (const i of diff) mine.add(i);
+    }
+  }
+  return { safe: [...safe], mine: [...mine] };
+}
+
+// 把互相有联系的未知格分成一组（组与组之间互不影响，可以分别穷举）
+function groupComponents(frontier, cons) {
+  const parent = new Map();
+  for (const c of frontier) parent.set(c, c);
+  const find = a => { while (parent.get(a) !== a) { parent.set(a, parent.get(parent.get(a))); a = parent.get(a); } return a; };
+  const union = (a, b) => { const ra = find(a), rb = find(b); if (ra !== rb) parent.set(ra, rb); };
+  for (const c of cons) for (let i = 1; i < c.cells.length; i++) union(c.cells[0], c.cells[i]);
+  const groups = new Map();
+  for (const c of frontier) {
+    const r = find(c);
+    if (!groups.has(r)) groups.set(r, []);
+    groups.get(r).push(c);
+  }
+  return [...groups.values()];
+}
+
+// 穷举一个分组里所有符合约束的布雷方式
+function enumerateComponent(cells, cons, cap) {
+  const n = cells.length;
+  const pos = new Map();
+  cells.forEach((c, i) => pos.set(c, i));
+  const local = cons.map(c => ({ idx: c.cells.map(x => pos.get(x)), need: c.need }));
+  const cur = new Int8Array(n).fill(-1);
+  const cnt = new Array(n + 1).fill(0);
+  const cellCnt = cells.map(() => new Array(n + 1).fill(0));
+  let solutions = 0, overflow = false;
+
+  // 剪枝：雷数已经超过要求、或剩下的格子不够填满要求，就砍掉这条分支
+  function feasible() {
+    for (const c of local) {
+      let sum = 0, unassigned = 0;
+      for (const i of c.idx) {
+        if (cur[i] === -1) unassigned++;
+        else sum += cur[i];
+      }
+      if (sum > c.need) return false;
+      if (sum + unassigned < c.need) return false;
+    }
+    return true;
+  }
+
+  function dfs(i, mines) {
+    if (overflow) return;
+    if (i === n) {
+      solutions++;
+      if (solutions > cap) { overflow = true; return; }
+      cnt[mines]++;
+      for (let j = 0; j < n; j++) if (cur[j] === 1) cellCnt[j][mines]++;
+      return;
+    }
+    for (const v of [0, 1]) {
+      cur[i] = v;
+      if (feasible()) dfs(i + 1, mines + v);
+      cur[i] = -1;
+      if (overflow) return;
+    }
+  }
+  dfs(0, 0);
+  return overflow ? null : { cnt, cellCnt, solutions };
+}
+
+// 没有任何线索时，优先点角、再点边（相邻格少，猜中安全的概率更高）
+function pickOpening(g) {
+  const cands = [];
+  for (let y = 0; y < g.rows; y++) {
+    for (let x = 0; x < g.cols; x++) {
+      const c = g.cells[at(g, x, y)];
+      if (!c.revealed && !c.flagged) cands.push({ i: at(g, x, y), x, y });
+    }
+  }
+  if (!cands.length) return -1;
+  const corner = p => (p.x === 0 || p.x === g.cols - 1) && (p.y === 0 || p.y === g.rows - 1);
+  const edge = p => p.x === 0 || p.y === 0 || p.x === g.cols - 1 || p.y === g.rows - 1;
+  const rank = p => (corner(p) ? 0 : edge(p) ? 1 : 2);
+  const best = Math.min(...cands.map(rank));
+  const pool = cands.filter(p => rank(p) === best);
+  return pool[Math.floor(g.rand() * pool.length)].i;
+}
+
+/**
+ * AI 的决策函数：返回 { action: 'reveal' | 'flag', cell, reason }
+ * 思路：先推理（必然安全的翻开、必然是雷的插旗），推不出来再按概率挑风险最小的猜。
+ */
+function aiDecide(g) {
+  if (g.status === 'won' || g.status === 'lost') return null;
+
+  const cons = buildConstraints(g);
+
+  // 第一层：基础规则 + 子集规则，反复套用直到没有新结论
+  if (cons.length) {
+    const b = basicDeduce(cons);
+    if (b.mine.length) return { action: 'flag', cell: b.mine[0], reason: '某个数字周围的未知格已排满，这一格可以确定是雷' };
+    if (b.safe.length) return { action: 'reveal', cell: b.safe[0], reason: '某个数字周围的雷都已标出，剩下的格子必然安全' };
+    const s = subsetDeduce(cons);
+    if (s.mine.length) return { action: 'flag', cell: s.mine[0], reason: '用两个数字的差集推出：这一格必定是雷' };
+    if (s.safe.length) return { action: 'reveal', cell: s.safe[0], reason: '用两个数字的差集推出：这一格必定安全' };
+  }
+
+  // 第二层：算概率（穷举边界上的所有合法布雷方式，取踩雷概率最低的格子）
+  const guess = aiGuess(g, cons);
+  if (guess) return guess;
+
+  // 兜底
+  const i = pickOpening(g);
+  if (i < 0) return null;
+  return { action: 'reveal', cell: i, reason: '没有可用线索，随便挑一个未知格' };
+}
+
+function aiGuess(g, cons) {
+  const hidden = [];
+  for (let i = 0; i < g.cells.length; i++) {
+    const c = g.cells[i];
+    if (!c.revealed && !c.flagged) hidden.push(i);
+  }
+  if (!hidden.length) return null;
+
+  const minesLeft = g.mines - g.flagCount;
+  if (minesLeft <= 0) {
+    return { action: 'reveal', cell: hidden[0], reason: '雷已全部标出，剩下的一定安全' };
+  }
+
+  const frontierSet = new Set();
+  for (const c of cons) for (const i of c.cells) frontierSet.add(i);
+  const frontier = hidden.filter(i => frontierSet.has(i));
+  const outside = hidden.filter(i => !frontierSet.has(i));
+
+  // 完全没有线索（开局），直接挑角/边
+  if (!frontier.length || !cons.length) {
+    return { action: 'reveal', cell: pickOpening(g), reason: '开局没有任何线索，先点边角——相邻格少，风险最低' };
+  }
+
+  // 组合数表：C(n, k)，用来计算"剩下这么多颗雷分给非边界格"有多少种分法
+  const nf = outside.length;
+  const C = new Array(nf + 1).fill(0);
+  for (let k = 0; k <= nf; k++) {
+    let v = 1;
+    for (let i = 1; i <= k; i++) v = v * (nf - k + i) / i;
+    C[k] = v;
+  }
+
+  const comps = groupComponents(frontier, cons);
+  const data = [];
+  for (const cells of comps) {
+    const cs = cons.filter(c => cells.includes(c.cells[0]));
+    const solved = enumerateComponent(cells, cs, 40000);
+    if (!solved) return { action: 'reveal', cell: pickOpening(g), reason: '局面太复杂，先挑一个未知格试探' };
+    data.push({ cells, ...solved });
+  }
+
+  // 把各个分组的可能性合并起来，同时考虑"剩余雷数"这个总约束
+  function dpExcluding(skip) {
+    let dp = [1];
+    for (let ci = 0; ci < data.length; ci++) {
+      if (ci === skip) continue;
+      const cnt = data[ci].cnt;
+      const nd = new Array(dp.length + cnt.length - 1).fill(0);
+      for (let a = 0; a < dp.length; a++) {
+        if (!dp[a]) continue;
+        for (let b = 0; b < cnt.length; b++) {
+          if (!cnt[b]) continue;
+          nd[a + b] += dp[a] * cnt[b];
+        }
+      }
+      dp = nd;
+    }
+    return dp;
+  }
+
+  const base = dpExcluding(-1);
+  let total = 0, expectedOutside = 0;
+  for (let t = 0; t < base.length; t++) {
+    if (!base[t]) continue;
+    const m = minesLeft - t;
+    if (m < 0 || m > nf) continue;
+    const w = base[t] * C[m];
+    total += w;
+    expectedOutside += w * m;
+  }
+  if (!(total > 0)) {
+    return { action: 'reveal', cell: pickOpening(g), reason: '当前局面没有可行解，只能随机试探' };
+  }
+
+  // 逐个算边界格"是雷"的概率
+  let best = null;
+  for (let ci = 0; ci < data.length; ci++) {
+    const comp = data[ci];
+    const other = dpExcluding(ci);
+    for (let j = 0; j < comp.cells.length; j++) {
+      let num = 0;
+      for (let k = 0; k < comp.cellCnt[j].length; k++) {
+        if (!comp.cellCnt[j][k]) continue;
+        for (let t = 0; t < other.length; t++) {
+          if (!other[t]) continue;
+          const m = minesLeft - t - k;
+          if (m < 0 || m > nf) continue;
+          num += other[t] * comp.cellCnt[j][k] * C[m];
+        }
+      }
+      const p = num / total;
+      if (!best || p < best.p) best = { p, cell: comp.cells[j], kind: 'frontier' };
+    }
+  }
+
+  // 非边界格（完全没线索的区域）的雷概率
+  let outsideP = 1;
+  if (nf > 0) outsideP = (expectedOutside / total) / nf;
+
+  // 如果非边界更安全，就挑一个边角去开新区域
+  if (nf > 0 && (!best || outsideP < best.p - 1e-9)) {
+    return {
+      action: 'reveal',
+      cell: pickOpening(g),
+      reason: '概率计算：未知区域每格是雷的概率约 ' + (outsideP * 100).toFixed(1) + '%，比边界更低'
+    };
+  }
+  if (!best) {
+    return { action: 'reveal', cell: pickOpening(g), reason: '没有可比较的格子，随机试探' };
+  }
+  return {
+    action: 'reveal',
+    cell: best.cell,
+    reason: '概率计算：这一格是雷的概率最低，约 ' + (best.p * 100).toFixed(1) + '%'
+  };
+}
+/* ==================== ENGINE_END ==================== */
+
+
+/* ==================== 界面部分（只负责显示和交互） ==================== */
+
+const COLS = 9, ROWS = 9, MINES = 10;     // 标准局：9×9，10 颗雷
+const THEME_KEY = 'minesweeper.theme.v2';  // 主题设置（角色配色 + 卡面图片）
+const STATS_KEY = 'minesweeper.stats.v1';
+
+const boardEl  = document.getElementById('board');
+const mineEl   = document.getElementById('mine-left');
+const timerEl  = document.getElementById('timer');
+const faceEl   = document.getElementById('btn-face');
+const statsEl  = document.getElementById('stats');
+const aiLineEl = document.getElementById('ai-line');
+const aiWhyEl  = document.getElementById('ai-why');
+const themeBtn = document.getElementById('btn-theme');
+const aiBtn    = document.getElementById('btn-ai');
+const panelEl  = document.getElementById('theme-panel');
+const charListEl = document.getElementById('char-list');
+const myThemesEl = document.getElementById('my-themes');
+const imgUrlEl   = document.getElementById('img-url');
+const imgHintEl  = document.getElementById('img-hint');
+const cardListEl = document.getElementById('card-list');
+const cardHintEl = document.getElementById('card-hint');
+const historyPanelEl = document.getElementById('history-panel');
+const historyListEl  = document.getElementById('history-list');
+const aiRecentEl     = document.getElementById('ai-recent');
+
+let game = null;
+let cellEls = [];
+let seconds = 0;
+let tick = null;
+
+// 人类玩家的战绩（AI 演示的单独统计，互不干扰）
+let stats = { games: 0, wins: 0, bestScore: 0, bestTime: null, history: [] };
+// AI 演示的战绩
+let aiStats = { games: 0, wins: 0, streak: 0, bestStreak: 0, recent: [] };
+
+let aiRunning = false;
+let aiTimer = null;
+let aiPauseUntil = 0;
+let settled = false;      // 本局是否已经结算过，避免重复计数
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STATS_KEY) || '{}');
+    if (s.stats) stats = Object.assign(stats, s.stats);
+    if (s.aiStats) aiStats = Object.assign(aiStats, s.aiStats);
+  } catch (e) { /* 读不出来就用默认值 */ }
+  try {
+    const t = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
+    if (t.cur) cur = Object.assign(cur, t.cur);
+    if (Array.isArray(t.themes)) myThemes = t.themes;
+  } catch (e) { /* 同上 */ }
+}
+
+function saveState() {
+  localStorage.setItem(STATS_KEY, JSON.stringify({ stats, aiStats }));
+}
+
+/* ==================== 角色主题（BanG Dream!） ====================
+   40 位主要角色的中文名与官方配色，取自 Bestdori 的公开角色数据接口：
+   https://bestdori.com/api/characters/all.5.json
+   （不是我自己编的颜色，是按角色设定色来的）
+   ==================== */
+const BANDS = [
+  ["Poppin'Party", [[1,"户山香澄","#FF5522"],[2,"花园多惠","#0077DD"],[3,"牛込里美","#FF55BB"],[4,"山吹沙绫","#FFCC11"],[5,"市谷有咲","#AA66DD"]]],
+  ["Afterglow", [[6,"美竹兰","#EE0022"],[7,"青叶摩卡","#00CCAA"],[8,"上原绯玛丽","#FF9999"],[9,"宇田川巴","#BB0033"],[10,"羽泽鸫","#FFEE88"]]],
+  ["Hello, Happy World!", [[11,"弦卷心","#FFEE22"],[12,"濑田薰","#AA33CC"],[13,"北泽育美","#FF9922"],[14,"松原花音","#44DDFF"],[15,"米歇尔","#006699"]]],
+  ["Pastel*Palettes", [[16,"丸山彩","#FF88BB"],[17,"冰川日菜","#55DDEE"],[18,"白鹭千圣","#FFEEAA"],[19,"大和麻弥","#99DD88"],[20,"若宫伊芙","#DDBBFF"]]],
+  ["Roselia", [[21,"凑友希那","#881188"],[22,"冰川纱夜","#00AABB"],[23,"今井莉莎","#DD2200"],[24,"宇田川亚子","#DD0088"],[25,"白金燐子","#BBBBBB"]]],
+  ["Morfonica", [[26,"仓田真白","#6677CC"],[27,"桐谷透子","#EE6666"],[28,"广町七深","#EE7744"],[29,"二叶筑紫","#EE7788"],[30,"八潮瑠唯","#669988"]]],
+  ["RAISE A SUILEN", [[31,"和奏瑞依","#CC0000"],[32,"朝日六花","#AAEE22"],[33,"佐藤益木","#EEBB44"],[34,"鳰原令王那","#FF99BB"],[35,"珠手知由","#00BBFF"]]],
+  ["MyGO!!!!!", [[36,"高松灯","#77BBDD"],[37,"千早爱音","#FF8899"],[38,"要乐奈","#77DD77"],[39,"长崎爽世","#FFDD88"],[40,"椎名立希","#7777AA"]]]
+];
+
+// 当前主题：kind 决定配色（classic 经典 / dark 深色 / char 角色），image 是可选的卡面图
+let cur = { kind: 'classic', charId: null, color: null, image: null, name: '' };
+let myThemes = [];        // 玩家自己保存的主题
+
+/* 每位角色的内置卡面。
+   每个字符串的第一位是稀有度，后面 6 位是资源编号；图片地址是把编号拼进
+   https://bestdori.com/assets/jp/characters/resourceset/res{编号}_rip/card_normal.png
+   这些编号取自 Bestdori 的卡片数据接口（/api/cards/all.5.json），
+   并且逐张验证过返回的确实是图片，而不是网页。 */
+const CARD_SETS = {
+  1: ["5001101","5001100","5001097","5001094","5001092","5001090","5001086","5001084","5001083","5001080","5001079","5001077"],
+  2: ["5002082","5002078","5002076","5002075","5002072","5002069","5002067","5002066","5002065","5002063","5002054","4002081"],
+  3: ["5003082","5003077","5003076","5003071","5003067","5003064","5003063","4003079","4003073","4003069","4003062","4003056"],
+  4: ["5004081","5004080","5004078","5004074","5004071","5004068","5004064","5004062","4004082","4004066","4004063","4004061"],
+  5: ["5005093","5005091","5005087","5005086","5005084","5005082","5005080","5005077","5005072","5005069","4005092","4005089"],
+  6: ["5006090","5006088","5006087","5006086","5006084","5006081","5006080","5006077","5006076","5006073","5006069","4006089"],
+  7: ["5007083","5007082","5007079","5007078","5007077","5007075","5007073","5007070","5007069","5007066","5007065","5007059"],
+  8: ["5008083","5008078","5008076","5008073","5008072","5008070","5008069","5008067","5008066","4008080","4008079","4008071"],
+  9: ["5009082","5009080","5009078","5009076","5009073","5009071","5009069","5009066","5009062","5009055","4009083","4009075"],
+  10: ["5010083","5010082","5010080","5010079","5010077","5010076","5010072","5010069","5010068","5010050","4010085","4010074"],
+  11: ["5011095","5011094","5011088","5011087","5011086","5011083","5011081","5011078","5011076","5011075","5011069","4011093"],
+  12: ["5012091","5012088","5012085","5012084","5012081","5012080","5012078","5012074","5012072","5012070","5012059","4012090"],
+  13: ["5013085","5013082","5013081","5013079","5013073","5013070","5013067","5013066","5013064","4013084","4013078","4013074"],
+  14: ["5014087","5014084","5014082","5014078","5014076","5014074","5014073","5014072","5014066","5014052","4014090","4014086"],
+  15: ["5015090","5015088","5015087","5015083","5015081","5015079","5015077","5015076","5015075","5015071","5015070","4015082"],
+  16: ["5016100","5016098","5016095","5016093","5016091","5016088","5016087","5016084","5016083","5016082","5016081","5016079"],
+  17: ["5017088","5017085","5017083","5017079","5017078","5017077","5017074","5017072","5017071","5017070","5017060","4017081"],
+  18: ["5018086","5018084","5018083","5018081","5018079","5018077","5018075","5018074","5018073","5018071","5018069","5018067"],
+  19: ["5019085","5019084","5019082","5019078","5019075","5019073","5019072","5019069","5019068","4019079","4019077","4019070"],
+  20: ["5020087","5020083","5020082","5020079","5020077","5020075","5020073","5020072","4020088","4020086","4020085","4020078"],
+  21: ["5021087","5021086","5021084","5021082","5021081","5021078","5021077","5021074","5021072","5021069","5021052","4021085"],
+  22: ["5022086","5022085","5022083","5022081","5022080","5022078","5022076","5022074","5022071","5022070","5022068","4022079"],
+  23: ["5023090","5023088","5023087","5023082","5023081","5023080","5023078","5023077","5023075","5023073","5023069","4023089"],
+  24: ["5024085","5024083","5024077","5024075","5024073","5024070","5024069","5024064","4024089","4024084","4024081","4024080"],
+  25: ["5025084","5025082","5025079","5025078","5025076","5025074","5025072","5025070","5025066","5025064","4025077","4025071"],
+  26: ["5026055","5026054","5026052","5026051","5026048","5026046","5026043","5026040","5026039","5026037","5026036","5026035"],
+  27: ["5027050","5027048","5027046","5027045","5027042","5027039","5027035","5027031","5027030","4027049","4027044","4027038"],
+  28: ["5028048","5028047","5028044","5028042","5028041","5028037","5028034","5028032","5028027","4028050","4028040","4028038"],
+  29: ["5029045","5029043","5029042","5029040","5029039","5029035","5029033","5029031","5029029","5029023","4029041","4029036"],
+  30: ["5030047","5030045","5030043","5030041","5030038","5030036","5030034","5030031","4030046","4030044","4030037","4030032"],
+  31: ["5031047","5031046","5031044","5031042","5031040","5031038","5031036","5031034","5031032","4031043","4031039","4031026"],
+  32: ["5032048","5032047","5032044","5032041","5032039","5032037","5032031","5032029","4032049","4032045","4032040","4032038"],
+  33: ["5033047","5033043","5033041","5033039","5033038","5033035","5033031","5033030","4033044","4033037","4033034","4033029"],
+  34: ["5034044","5034041","5034040","5034039","5034037","5034035","5034033","5034032","5034029","5034014","4034043","4034030"],
+  35: ["5035046","5035045","5035042","5035038","5035037","5035033","5035029","5035024","4035044","4035043","4035041","4035039"],
+  36: ["5036014","5036013","5036012","5036011","5036010","5036008","5036007","5036004","4036015","4036009","4036005","3036003"],
+  37: ["5037016","5037015","5037013","5037011","5037008","5037004","4037009","3037014","3037012","3037010","3037005","3037003"],
+  38: ["5038013","5038011","5038009","5038008","5038005","4038010","3038012","3038007","3038004","3038003"],
+  39: ["5039013","5039012","5039011","5039009","5039007","5039004","4039010","4039008","3039014","3039003"],
+  40: ["5040013","5040012","5040011","5040009","5040005","4040008","4040007","3040017","3040014","3040004","3040003"]
+};
+
+// 把资源编号拼成卡面图片地址
+function cardUrl(code) {
+  return 'https://bestdori.com/assets/jp/characters/resourceset/res' +
+         code.slice(1) + '_rip/card_normal.png';
+}
+
+function hex2rgb(h) {
+  h = String(h).replace('#', '');
+  if (h.length === 3) h = h.split('').map(c => c + c).join('');
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+// 把两个颜色按比例混合，用来从角色官方色推导出一整套配色
+function mix(a, b, t) {
+  const A = hex2rgb(a), B = hex2rgb(b);
+  return 'rgb(' + A.map((v, i) => Math.round(v + (B[i] - v) * t)).join(',') + ')';
+}
+
+const CHAR_VARS = ['--page-bg', '--frame', '--frame-light', '--frame-dark',
+  '--cell-up', '--cell-down', '--cell-line', '--board-bg', '--hud-text',
+  '--accent', '--panel'];
+
+function applyTheme() {
+  const root = document.documentElement;
+  CHAR_VARS.forEach(v => root.style.removeProperty(v));   // 先清掉上一次的内联颜色
+
+  if (cur.kind === 'char' && cur.color) {
+    root.setAttribute('data-theme', 'char');
+    const c = cur.color;
+    const set = (k, v) => root.style.setProperty(k, v);
+    // 配色思路：未翻开的格子和面板用较饱和的角色色，已翻开的格子几乎白，
+    // 立体边框的暗面取角色色加深——这样"翻开/没翻开"一眼就能分辨。
+    set('--page-bg',   mix(c, '#ffffff', 0.88));
+    set('--frame',     mix(c, '#ffffff', 0.62));
+    set('--frame-light', '#ffffff');
+    set('--frame-dark', mix(c, '#000000', 0.45));
+    set('--cell-up',   mix(c, '#ffffff', 0.62));
+    set('--cell-down', mix(c, '#ffffff', 0.93));
+    set('--cell-line', mix(c, '#555555', 0.55));
+    set('--board-bg',  mix(c, '#000000', 0.45));
+    set('--hud-text',  mix(c, '#ffffff', 0.45));
+    set('--accent',    c);
+    set('--panel',     '#ffffff');
+  } else {
+    root.setAttribute('data-theme', cur.kind === 'dark' ? 'dark' : 'classic');
+  }
+
+  // 卡面图片：铺在整页背景上
+  if (cur.image) {
+    root.style.setProperty('--photo', 'url("' + String(cur.image).replace(/"/g, '%22') + '")');
+    document.body.classList.add('has-photo');
+  } else {
+    document.body.classList.remove('has-photo');
+  }
+
+  themeBtn.textContent = cur.kind === 'dark' ? '☀️ 经典主题' : '🌙 深色主题';
+  saveThemeState();
+  renderThemePanel();
+}
+
+function saveThemeState() {
+  try {
+    localStorage.setItem(THEME_KEY, JSON.stringify({ cur: cur, themes: myThemes }));
+  } catch (e) {
+    // 本地存储有容量上限，图片太大时会存不下
+    imgHintEl.textContent = '图片太大，浏览器存不下了（超出本地存储上限），本次只在当前页面生效。';
+  }
+}
+
+function findChar(id) {
+  for (const [band, list] of BANDS) {
+    for (const [cid, name, color] of list) {
+      if (cid === id) return { id: cid, n: name, c: color, band: band };
+    }
+  }
+  return null;
+}
+
+function allChars() {
+  const out = [];
+  for (const [band, list] of BANDS) for (const [id, n, c] of list) out.push({ id, n, c, band });
+  return out;
+}
+
+function renderThemePanel() {
+  // 角色按钮
+  let html = '';
+  for (const [band, list] of BANDS) {
+    html += '<div class="band-name">' + band + '</div><div class="chips">';
+    for (const [id, name, color] of list) {
+      html += '<button class="chip' + (cur.charId === id ? ' on' : '') + '" data-id="' + id + '">' +
+              '<span class="dot" style="background:' + color + '"></span>' + name + '</button>';
+    }
+    html += '</div>';
+  }
+  charListEl.innerHTML = html;
+
+  // 我保存过的主题
+  if (!myThemes.length) {
+    myThemesEl.innerHTML = '<span class="tp-hint" style="margin:0">还没有保存过主题。调好配色或卡面后，点上面的「保存当前为主题」。</span>';
+  } else {
+    myThemesEl.innerHTML = myThemes.map((t, i) =>
+      '<button class="chip" data-theme-index="' + i + '">' +
+      '<span class="dot" style="background:' + (t.color || '#c0c0c0') + '"></span>' +
+      (t.name || ('主题 ' + (i + 1))) + '<span class="x" data-del="' + i + '">✕</span></button>').join('');
+  }
+
+  renderCards();
+}
+
+// 画出当前角色的卡面缩略图，点一张就换背景
+function renderCards() {
+  if (!cur.charId) {
+    cardListEl.innerHTML = '';
+    cardHintEl.textContent = '先点下面任意一个角色，这里会列出 TA 的卡面。';
+    return;
+  }
+  const list = CARD_SETS[cur.charId] || [];
+  if (!list.length) {
+    cardListEl.innerHTML = '';
+    cardHintEl.textContent = '这个角色没有内置卡面，可以在上面粘贴图片地址。';
+    return;
+  }
+  cardHintEl.textContent = '「' + (cur.name || '') + '」的卡面 ' + list.length + ' 张，点一张就换背景：';
+  cardListEl.innerHTML = list.map(function (code) {
+    const url = cardUrl(code);
+    return '<img loading="lazy" data-card="' + code + '" src="' + url + '" alt="卡面"' +
+           (cur.image === url ? ' class="on"' : '') + '>';
+  }).join('');
+  // 网络不通时（比如代理拦住了 bestdori）把加载失败的缩略图压暗
+  Array.prototype.forEach.call(cardListEl.querySelectorAll('img'), function (im) {
+    im.onerror = function () { im.classList.add('bad'); };
+  });
+}
+
+function applyChar(id) {
+  const ch = findChar(id);
+  if (!ch) return;
+  cur.kind = 'char';
+  cur.charId = id;
+  cur.color = ch.c;
+  cur.name = ch.n;
+  applyTheme();
+  imgHintEl.textContent = '已应用「' + ch.n + '」的配色（官方设定色 ' + ch.c + '）。需要卡面的话，在下面贴图片链接或选本地图片。';
+}
+
+function setImage(src, fromFile) {
+  cur.image = src;
+  applyTheme();
+  if (!src) { imgHintEl.textContent = '卡面图片已清除。'; return; }
+  if (fromFile || String(src).slice(0, 5) === 'data:') {
+    imgHintEl.textContent = '本地图片已应用（只在你的浏览器里显示，不会上传到仓库）。';
+    return;
+  }
+  imgHintEl.textContent = '正在加载图片…';
+  const im = new Image();
+  let settled = false;
+  const finish = ok => {
+    if (settled) return;
+    settled = true;
+    imgHintEl.textContent = ok
+      ? '卡面已应用。'
+      : '图片加载失败：可能是地址不对，或那个站点不允许外链。可以换成本地图片。';
+  };
+  im.onload = () => finish(true);
+  im.onerror = () => finish(false);
+  im.src = src;
+  setTimeout(() => finish(false), 8000);
+}
+
+function readLocalImage(file) {
+  const reader = new FileReader();
+  reader.onload = function () {
+    const im = new Image();
+    im.onload = function () {
+      // 先缩到合适尺寸再存，否则本地存储放不下
+      const scale = Math.min(1, 1280 / im.width);
+      const cv = document.createElement('canvas');
+      cv.width = Math.round(im.width * scale);
+      cv.height = Math.round(im.height * scale);
+      cv.getContext('2d').drawImage(im, 0, 0, cv.width, cv.height);
+      setImage(cv.toDataURL('image/jpeg', 0.82), true);
+    };
+    im.onerror = function () { imgHintEl.textContent = '这张图片读不出来，换一张试试。'; };
+    im.src = reader.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function saveCurrentTheme() {
+  const name = cur.name || (cur.kind === 'char' ? '角色主题' : (cur.kind === 'dark' ? '深色主题' : '经典主题'));
+  myThemes.unshift({
+    name: name,
+    kind: cur.kind,
+    charId: cur.charId,
+    color: cur.color,
+    image: cur.image
+  });
+  if (myThemes.length > 12) myThemes.pop();      // 最多留 12 条，避免占满本地存储
+  applyTheme();
+  imgHintEl.textContent = '已保存主题「' + name + '」。以后点一下就能切回来。';
+}
+
+function randomTheme() {
+  if (myThemes.length && Math.random() < 0.4) {
+    const t = myThemes[Math.floor(Math.random() * myThemes.length)];
+    applySavedTheme(t);
+    imgHintEl.textContent = '随机切到了你保存的主题「' + (t.name || '未命名') + '」。';
+    return;
+  }
+  const list = allChars();
+  const ch = list[Math.floor(Math.random() * list.length)];
+  // 如果这个角色你存过带卡面的主题，就顺带把卡面也用上
+  const saved = myThemes.find(t => t.charId === ch.id && t.image);
+  const cards = CARD_SETS[ch.id] || [];
+  const auto = saved ? null : (cards.length ? cards[Math.floor(Math.random() * cards.length)] : null);
+  cur = {
+    kind: 'char', charId: ch.id, color: ch.c, name: ch.n,
+    image: saved ? saved.image : (auto ? cardUrl(auto) : null)
+  };
+  applyTheme();
+  imgHintEl.textContent = '随机到了「' + ch.n + '」（' + ch.band + '）' +
+    (saved ? '，并带上了你保存的卡面。' : (auto ? '，并随机带了一张卡面。' : '。'));
+}
+
+// 随机换一张当前角色的卡面
+function randomCard() {
+  if (!cur.charId) {
+    const list = allChars();
+    applyChar(list[Math.floor(Math.random() * list.length)].id);
+  }
+  const cards = CARD_SETS[cur.charId] || [];
+  if (!cards.length) {
+    imgHintEl.textContent = '这个角色没有内置卡面，可以粘贴图片地址或选本地图片。';
+    return;
+  }
+  setImage(cardUrl(cards[Math.floor(Math.random() * cards.length)]), false);
+  imgHintEl.textContent = '随机换了一张「' + (cur.name || '') + '」的卡面。';
+}
+
+function applySavedTheme(t) {
+  cur = {
+    kind: t.kind || 'char',
+    charId: t.charId || null,
+    color: t.color || null,
+    image: t.image || null,
+    name: t.name || ''
+  };
+  applyTheme();
+}
+
+function fmt3(n) {
+  n = Math.max(0, Math.min(999, Math.round(n)));
+  return String(n).padStart(3, '0');
+}
+
+function newBoard() {
+  game = newGame(COLS, ROWS, MINES, mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0));
+  seconds = 0;
+  settled = false;
+  stopTimer();
+  aiPauseUntil = 0;
+  buildCells();
+  faceEl.textContent = '🙂';
+  timerEl.textContent = '000';
+  render();
+}
+
+function buildCells() {
+  boardEl.style.gridTemplateColumns = 'repeat(' + COLS + ', var(--cell))';
+  boardEl.innerHTML = '';
+  cellEls = [];
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const d = document.createElement('div');
+    d.className = 'cell';
+    d.dataset.i = i;
+    boardEl.appendChild(d);
+    cellEls.push(d);
+  }
+}
+
+function render() {
+  for (let i = 0; i < game.cells.length; i++) {
+    const c = game.cells[i];
+    const el = cellEls[i];
+    el.className = 'cell';
+    el.textContent = '';
+    if (c.flagged && !c.revealed) {
+      el.classList.add('flag');
+      el.textContent = '🚩';
+    } else if (c.revealed && c.mine) {
+      el.classList.add('mine');
+      el.textContent = '💣';
+    } else if (c.revealed) {
+      el.classList.add('down');
+      if (c.adj > 0) {
+        el.textContent = c.adj;
+        el.classList.add('n' + c.adj);
+      }
+    }
+  }
+  // 输了的时候，把标错的旗子标出来
+  if (game.status === 'lost') {
+    for (let i = 0; i < game.cells.length; i++) {
+      const c = game.cells[i];
+      if (c.flagged && !c.mine) { cellEls[i].textContent = '❌'; cellEls[i].classList.add('wrong'); }
+    }
+  }
+  mineEl.textContent = fmt3(game.mines - game.flagCount);
+  renderStats();
+}
+
+function renderStats() {
+  const rate = stats.games ? Math.round(stats.wins / stats.games * 100) : 0;
+  const items = [
+    ['本局得分', currentScore()],
+    ['局数', stats.games],
+    ['胜场', stats.wins],
+    ['胜率', rate + '%'],
+    ['最高分', stats.bestScore],
+    ['最佳用时', stats.bestTime === null ? '--' : stats.bestTime + ' 秒'],
+    ['AI 演示局数', aiStats.games],
+    ['AI 胜场', aiStats.wins],
+    ['AI 最长连胜', aiStats.bestStreak]
+  ];
+  statsEl.innerHTML = items.map(([k, v]) => '<div class="stat"><b>' + v + '</b><span>' + k + '</span></div>').join('');
+}
+
+// 最近 10 局战绩列表（新增功能：多局战绩）
+function renderHistory() {
+  const h = stats.history || [];
+  if (!h.length) {
+    historyListEl.innerHTML = '<span class="tp-hint" style="margin:0">还没有打完的局。开一局试试，每打完一局都会自动记录，最多保留最近 10 局。</span>';
+    return;
+  }
+  historyListEl.innerHTML = h.map(function (g, i) {
+    const d = new Date(g.t);
+    const pad = n => String(n).padStart(2, '0');
+    const when = (d.getMonth() + 1) + '/' + d.getDate() + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return '<div class="hist-row">' +
+      '<span class="hist-no">' + (h.length - i) + '</span>' +
+      '<span class="hist-res ' + (g.win ? 'win' : 'lose') + '">' + (g.win ? '通关' : '踩雷') + '</span>' +
+      '<span class="hist-meta">' + when + '　用时 ' + g.sec + ' 秒　得分 ' + g.score + '</span>' +
+      '</div>';
+  }).join('');
+}
+
+// AI 最近 10 局的胜负（✓ / ✗）
+function renderAIRecent() {
+  const r = aiStats.recent || [];
+  if (!r.length) { aiRecentEl.textContent = ''; return; }
+  aiRecentEl.innerHTML = 'AI 最近 ' + r.length + ' 局：' + r.map(function (x) {
+    return '<span class="' + (x === 'w' ? 'ai-recent-win' : 'ai-recent-lose') + '">' +
+           (x === 'w' ? '✓' : '✗') + '</span>';
+  }).join(' ');
+}
+
+// 本局的实时得分：赢下来的瞬间定格，踩雷则归零
+function currentScore() {
+  if (!game) return 0;
+  if (game.status === 'lost') return 0;
+  return Math.max(0, 1000 - seconds * 10);
+}
+
+function startTimer() {
+  if (tick) return;
+  tick = setInterval(function () {
+    seconds++;
+    timerEl.textContent = fmt3(seconds);
+    renderStats();          // 让"本局得分"跟着时间实时下降
+  }, 1000);
+}
+function stopTimer() { if (tick) { clearInterval(tick); tick = null; } }
+
+// 一局结束后结算（AI 演示和人类玩家分开算）
+function settleGame(byAI) {
+  const won = game.status === 'won';
+  const now = Date.now();
+  if (byAI) {
+    aiStats.games++;
+    aiStats.recent.push(won ? 'w' : 'l');
+    if (aiStats.recent.length > 10) aiStats.recent.shift();   // 只留最近 10 局
+    if (won) {
+      aiStats.wins++;
+      aiStats.streak++;
+      aiStats.bestStreak = Math.max(aiStats.bestStreak, aiStats.streak);
+    } else {
+      aiStats.streak = 0;
+    }
+  } else {
+    stats.games++;
+    const score = won ? Math.max(0, 1000 - seconds * 10) : 0;
+    // 每打完一局就追加一条记录，只保留最近 10 局
+    stats.history.push({ t: now, win: won, sec: seconds, score: score });
+    if (stats.history.length > 10) stats.history.shift();
+    if (won) {
+      stats.wins++;
+      stats.bestScore = Math.max(stats.bestScore, score);
+      stats.bestTime = stats.bestTime === null ? seconds : Math.min(stats.bestTime, seconds);
+    }
+  }
+  saveState();
+  renderHistory();
+  renderAIRecent();
+  faceEl.textContent = won ? '😎' : '😵';
+}
+
+/* ---------- 交互：鼠标 + 触屏 ---------- */
+let pressTimer = null;
+let longPressed = false;
+
+boardEl.addEventListener('mousedown', function (e) {
+  if (aiRunning) return;
+  const el = e.target.closest('.cell');
+  if (!el) return;
+  faceEl.textContent = '😮';
+  if (e.button === 2) {                       // 右键：未翻开就插旗，已翻开就快速展开
+    const p = cellXY(el);
+    act(function () {
+      const c = game.cells[at(game, p.x, p.y)];
+      if (c.revealed) chord(game, p.x, p.y); else toggleFlag(game, p.x, p.y);
+    });
+  }
+});
+
+boardEl.addEventListener('mouseup', function (e) {
+  if (aiRunning) return;
+  const el = e.target.closest('.cell');
+  if (!el) return;
+  if (e.button !== 0) return;
+  const p = cellXY(el);
+  leftClick(p.x, p.y);
+});
+
+boardEl.addEventListener('contextmenu', e => e.preventDefault());
+
+// 手机：长按 450ms 插旗
+boardEl.addEventListener('touchstart', function (e) {
+  if (aiRunning) return;
+  const el = e.target.closest('.cell');
+  if (!el) return;
+  longPressed = false;
+  pressTimer = setTimeout(function () {
+    longPressed = true;
+    const p = cellXY(el);
+    act(function () { toggleFlag(game, p.x, p.y); });
+    if (navigator.vibrate) navigator.vibrate(15);
+  }, 450);
+}, { passive: true });
+
+boardEl.addEventListener('touchend', function (e) {
+  if (aiRunning) return;
+  clearTimeout(pressTimer);
+  if (longPressed) { e.preventDefault(); return; }
+  const el = e.target.closest('.cell');
+  if (!el) return;
+  e.preventDefault();
+  const p = cellXY(el);
+  leftClick(p.x, p.y);
+}, { passive: false });
+
+boardEl.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive: true });
+
+function cellXY(el) {
+  const i = Number(el.dataset.i);
+  return { x: i % COLS, y: (i / COLS) | 0 };
+}
+
+/**
+ * 所有玩家操作统一走这个入口：执行 → 重画 → 计时 →（必要时）结算。
+ * 之前左键点数字只调用了展开函数、漏了"重画"这一步，导致数据变了但屏幕没更新，
+ * 看起来就像功能坏了。统一入口以后就不会再漏。
+ */
+function act(fn) {
+  const before = game.status;
+  fn();
+  afterMove(before);
+}
+
+// 左键：未翻开就翻开；已翻开且是数字，就快速展开周围
+function leftClick(x, y) {
+  const c = game.cells[at(game, x, y)];
+  if (!c.revealed) { act(function () { reveal(game, x, y); }); return; }
+  if (c.adj === 0) return;
+  act(function () { chord(game, x, y); });
+}
+
+function afterMove(before) {
+  if (game.status === 'playing' && !tick) startTimer();
+  render();
+  if (game.status === 'won' || game.status === 'lost') {
+    stopTimer();
+    // 只有"这一局刚刚结束"才结算，避免后续操作重复计数
+    if (!settled) { settled = true; settleGame(false); }
+  } else {
+    faceEl.textContent = '🙂';
+  }
+}
+
+/* ---------- AI 自动演示 ---------- */
+function startAI() {
+  aiRunning = true;
+  aiBtn.textContent = '⏸ 停止演示';
+  aiBtn.classList.add('primary');
+  newBoard();
+  // 注意：这里不清零连胜。连胜只会被"踩雷"打断，
+  // 中途停下来再继续不算断，否则最长连胜永远涨不上去。
+  render();
+  aiTimer = setInterval(aiTick, 110);
+}
+
+function stopAI(msg) {
+  aiRunning = false;
+  clearInterval(aiTimer);
+  aiTimer = null;
+  aiBtn.textContent = '▶ AI 自动演示';
+  aiBtn.classList.remove('primary');
+  if (msg) aiLineEl.innerHTML = msg;
+}
+
+function aiTick() {
+  // 上一局刚结束：停一下，然后自动开新的一局继续演示
+  if (game.status === 'won' || game.status === 'lost') {
+    if (!aiPauseUntil) {
+      aiPauseUntil = Date.now() + 900;
+      stopTimer();
+      if (!settled) { settled = true; settleGame(true); }
+      aiLineEl.innerHTML = aiStatusText('本局' + (game.status === 'won' ? '通关' : '踩雷'));
+    }
+    if (Date.now() >= aiPauseUntil) {
+      aiPauseUntil = 0;
+      newBoard();
+    }
+    return;
+  }
+
+  if (game.status === 'ready') {
+    // 开局第一下交给 AI 选边角
+    const i = pickOpening(game);
+    reveal(game, i % COLS, (i / COLS) | 0);
+    startTimer();
+    render();
+    aiWhyEl.textContent = 'AI：开局没有线索，先点边角位置。';
+    return;
+  }
+
+  const d = aiDecide(game);
+  if (!d) return;
+  const x = d.cell % COLS, y = (d.cell / COLS) | 0;
+  const before = game.status;
+  if (d.action === 'flag') toggleFlag(game, x, y);
+  else reveal(game, x, y);
+  render();
+  aiWhyEl.textContent = 'AI：' + d.reason + '（操作位置：第 ' + (y + 1) + ' 行第 ' + (x + 1) + ' 列）';
+  aiLineEl.innerHTML = aiStatusText(
+    (game.status === 'won' || game.status === 'lost') && before !== game.status
+      ? '本局' + (game.status === 'won' ? '通关' : '踩雷')
+      : ''
+  );
+}
+
+// AI 演示的状态文字：达标后会一直显示，而且演示不会停，最长连胜可以继续涨
+function aiStatusText(prefix) {
+  return 'AI 演示中' + (prefix ? ' · ' + prefix : '') +
+    ' · 当前连胜 ' + aiStats.streak + '/2' +
+    ' · 最长 ' + aiStats.bestStreak + ' 局' +
+    (aiStats.streak >= 2 ? '　<span class="ok">✅ 已达标（≥2 局）</span>' : '');
+}
+
+/* ---------- 按钮 ---------- */
+document.getElementById('btn-new').onclick = function () { if (!aiRunning) newBoard(); };
+faceEl.onclick = function () { if (!aiRunning) newBoard(); };
+themeBtn.onclick = function () {
+  cur.kind = (cur.kind === 'dark') ? 'classic' : 'dark';
+  cur.color = null;
+  cur.charId = null;
+  applyTheme();
+};
+
+/* ---------- 角色主题面板的交互 ---------- */
+document.getElementById('btn-chars').onclick = function () {
+  panelEl.classList.toggle('open');
+};
+document.getElementById('btn-history').onclick = function () {
+  historyPanelEl.classList.toggle('open');
+  renderHistory();
+};
+document.getElementById('btn-history-clear').onclick = function () {
+  stats.history = [];
+  aiStats.recent = [];
+  saveState();
+  renderHistory();
+  renderAIRecent();
+};
+document.getElementById('btn-rand').onclick = randomTheme;
+document.getElementById('btn-rand-card').onclick = randomCard;
+document.getElementById('btn-img-apply').onclick = function () {
+  const url = imgUrlEl.value.trim();
+  if (!url) { imgHintEl.textContent = '请先粘贴一张图片地址，或者用下面的「选择本地图片」。'; return; }
+  setImage(url, false);
+};
+document.getElementById('btn-img-clear').onclick = function () { setImage(null); };
+document.getElementById('img-file').onchange = function (e) {
+  if (e.target.files && e.target.files[0]) readLocalImage(e.target.files[0]);
+};
+document.getElementById('btn-save-theme').onclick = saveCurrentTheme;
+
+charListEl.addEventListener('click', function (e) {
+  const chip = e.target.closest('.chip');
+  if (chip && chip.dataset.id) applyChar(Number(chip.dataset.id));
+});
+cardListEl.addEventListener('click', function (e) {
+  const im = e.target.closest('img');
+  if (im && im.dataset.card) setImage(cardUrl(im.dataset.card), false);
+});
+myThemesEl.addEventListener('click', function (e) {
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    myThemes.splice(Number(del.dataset.del), 1);
+    applyTheme();
+    return;
+  }
+  const chip = e.target.closest('[data-theme-index]');
+  if (chip) {
+    const t = myThemes[Number(chip.dataset.themeIndex)];
+    if (t) {
+      applySavedTheme(t);
+      imgHintEl.textContent = '已切换到主题「' + (t.name || '未命名') + '」。';
+    }
+  }
+});
+
+aiBtn.onclick = function () { if (aiRunning) stopAI('AI 演示：已手动停止'); else startAI(); };
+document.getElementById('btn-reset').onclick = function () {
+  if (!confirm('确定要清空所有统计数据吗？（局数、最高分、最佳用时、AI 战绩都会归零）')) return;
+  stats = { games: 0, wins: 0, bestScore: 0, bestTime: null, history: [] };
+  aiStats = { games: 0, wins: 0, streak: 0, bestStreak: 0, recent: [] };
+  saveState();
+  renderStats();
+  renderHistory();
+  renderAIRecent();
+  aiLineEl.textContent = 'AI 演示：未开始';
+};
+
+loadState();
+applyTheme();
+newBoard();
+renderHistory();
+renderAIRecent();
+
+// 供自动化测试读取内部状态用（对正常游戏没有任何影响）
+window.__minesweeper = {
+  get game() { return game; },
+  get theme() { return cur; },
+  get savedThemes() { return myThemes; },
+  get cardSets() { return CARD_SETS; },
+  cardListHtml: function () { return cardListEl.innerHTML; },
+  get stats() { return { human: stats, ai: aiStats }; },
+  historyHtml: function () { return historyListEl.innerHTML; },
+  cellEl: function (i) { return cellEls[i]; },
+  // 引擎函数：仅供自动化测试直接驱动棋盘用
+  newBoard: newBoard,
+  reveal: reveal,
+  toggleFlag: toggleFlag,
+  chord: chord,
+  aiDecide: aiDecide,
+  cardUrl: cardUrl,
+  startAI: startAI,
+  stopAI: stopAI,
+  aiTick: aiTick,
+  get aiRunning() { return aiRunning; }
+};
+</script>
+</body>
+</html>
