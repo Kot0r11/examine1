@@ -1,0 +1,24 @@
+Running program: ../sw/bin/helloworld.hex
+ClkFrequency:         20MHz
+UartRealBaudRate:     125000
+@     42050ns | [JTAG] Initialization success
+@     42050ns | [JTAG] Writing 0x12345678 to 0x10000000
+@     94600ns | [JTAG] Read 0x12345678 from 0x10000000
+@     94600ns | [JTAG] Read back correct data
+@     94600ns | [JTAG] Loading binary from ../sw/bin/helloworld.hex
+@     96900ns | [JTAG] Writing to memory @10000000 
+@    106100ns | [JTAG] Writing to memory @1000000c 
+@    119900ns | [JTAG] Writing to memory @10000020 
+@   1401000ns | [CORE] Waking core via CLINT msip
+@   1401000ns | [JTAG] Writing 0x00000001 to 0x02040000
+@   1424050ns | [JTAG] Halting hart 0... 
+@   1437400ns | [JTAG] Halted
+@   1439700ns | [JTAG] Resumed hart 0 
+@   1439700ns | [CORE] Wait for end of code...
+@   3461800ns | [UART] Hello World from Croc!
+@   3461800ns | [UART] raw: '{'h48, 'h65, 'h6c, 'h6c, 'h6f, 'h20, 'h57, 'h6f, 'h72, 'h6c, 'h64, 'h20, 'h66, 'h72, 'h6f, 'h6d, 'h20, 'h43, 'h72, 'h6f, 'h63, 'h21, 'ha}
+@   3488950ns | [JTAG] Simulation finished: SUCCESS
+- ../rtl/test\croc_vip.sv:278: Verilog $finish
+- S i m u l a t i o n   R e p o r t: Verilator 5.050 2026-07-01
+- Verilator: $finish at 3ms; walltime 6.829 s; speed 510.902 us/s
+- Verilator: cpu 0.000 s on 1 threads; allocated 149 MB
