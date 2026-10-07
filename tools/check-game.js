@@ -75,6 +75,10 @@ const must = [
   ['通关后把雷标出来', 'c.mine && !c.flagged'],
   ['新增功能：多局战绩', 'renderHistory'],
   ['AI 连胜不会被中途停下清零', '这里不清零连胜'],
+  ['难度选择：四档配置', 'const LEVELS'],
+  ['难度选择：自定义参数校验', 'btn-custom-start'],
+  ['大棋盘自动缩放格子', 'function fitCell'],
+  ['AI 演示固定标准局', 'AI_LEVEL'],
 ];
 console.log('');
 must.forEach(([name, kw]) => {

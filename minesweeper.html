@@ -226,6 +226,28 @@
   .tip { min-height: 19px; font-size: 12px; color: var(--accent); text-align: center; max-width: 420px; line-height: 1.5; }
 
   /* ---------- 角色主题面板 ---------- */
+  /* ---------- 难度选择 ---------- */
+  .difficulty { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+  .diff-btn {
+    font-family: inherit; font-size: 13px; padding: 5px 13px;
+    border-radius: 999px; border: 1px solid var(--frame-dark);
+    background: var(--panel); color: var(--text); cursor: pointer;
+  }
+  .diff-btn.on {
+    border-color: var(--accent); color: var(--accent); font-weight: 700;
+    box-shadow: inset 0 0 0 2px var(--accent);
+  }
+  .custom-row {
+    display: none; flex-wrap: wrap; gap: 10px;
+    align-items: center; justify-content: center; font-size: 13px;
+  }
+  .custom-row.open { display: flex; }
+  .custom-row input {
+    width: 58px; font-family: inherit; font-size: 13px; padding: 3px 6px;
+    border-radius: 6px; border: 1px solid var(--frame-dark);
+    background: var(--panel); color: var(--text);
+  }
+
   .theme-panel {
     display: none;
     width: 100%;
@@ -287,6 +309,22 @@
 <body>
 
 <h1>扫 雷</h1>
+
+<!-- 难度选择：初级 / 中级 / 高级 是经典扫雷的标准配置，自定义可以自己填尺寸 -->
+<div class="difficulty" id="difficulty">
+  <button class="diff-btn on" data-diff="beginner">初级 9×9</button>
+  <button class="diff-btn" data-diff="intermediate">中级 16×16</button>
+  <button class="diff-btn" data-diff="expert">高级 30×16</button>
+  <button class="diff-btn" data-diff="custom">自定义</button>
+</div>
+
+<div class="custom-row" id="custom-row">
+  <label>宽 <input type="number" id="cw" value="12" min="5" max="50"></label>
+  <label>高 <input type="number" id="ch" value="12" min="5" max="30"></label>
+  <label>雷 <input type="number" id="cm" value="20" min="1" max="500"></label>
+  <button class="mini" id="btn-custom-start">用这些参数开新局</button>
+  <span class="tp-hint" id="custom-hint" style="margin:0"></span>
+</div>
 
 <div class="toolbar">
   <button id="btn-new" class="primary">新游戏</button>
@@ -356,7 +394,7 @@
 
 <div class="ai-box">
   <div id="ai-line">AI 演示：未开始</div>
-  <div class="why" id="ai-why">点击上面的「AI 自动演示」，它会自己推理并完成 9×9、10 雷的标准局。连胜只有踩雷才会中断，中途停下来再继续不算断，所以最长连胜可以一直累积。</div>
+<div class="why" id="ai-why">点击上面的「AI 自动演示」，它会自己推理并完成 9×9、10 雷的标准局（任务书的硬指标就是这一档，所以演示会自动切回初级）。连胜只有踩雷才会中断，中途停下来再继续不算断，所以最长连胜可以一直累积。</div>
   <div class="why" id="ai-recent"></div>
 </div>
 
@@ -364,7 +402,8 @@
   左键翻开 · 右键插旗 · 点已翻开的数字可快速展开周围 · 手机上长按插旗<br>
   <b>点数字的规则</b>：它周围插的旗子数正好等于数字时，会一次展开其余格子；旗子不够时下方会给出提示<br>
   第一次点击必定是安全区（连周围 8 格都不会有雷）<br>
-  得分规则：拿下本局得「1000 - 用时秒数 × 10」分（最低 0 分），踩雷不得分
+得分规则：基础分 = 雷数 × 100，每用 1 秒扣 10 分（最低 0 分），踩雷不得分<br>
+难度：初级 9×9/10 雷 · 中级 16×16/40 雷 · 高级 30×16/99 雷 · 自定义可自己填
 </p>
 
 <script>
@@ -787,7 +826,15 @@ function aiGuess(g, cons) {
 
 /* ==================== 界面部分（只负责显示和交互） ==================== */
 
-const COLS = 9, ROWS = 9, MINES = 10;     // 标准局：9×9，10 颗雷
+// 难度配置：初级/中级/高级 用的是经典扫雷的标准数字，自定义可以自己填
+const LEVELS = {
+  beginner:     { name: '初级',   cols: 9,  rows: 9,  mines: 10 },
+  intermediate: { name: '中级',   cols: 16, rows: 16, mines: 40 },
+  expert:       { name: '高级',   cols: 30, rows: 16, mines: 99 },
+  custom:       { name: '自定义', cols: 12, rows: 12, mines: 20 }
+};
+let levelKey = 'beginner';                 // 当前难度
+const AI_LEVEL = 'beginner';               // AI 演示固定跑任务书要求的标准局（9×9、10 雷）
 const THEME_KEY = 'minesweeper.theme.v2';  // 主题设置（角色配色 + 卡面图片）
 const STATS_KEY = 'minesweeper.stats.v1';
 
@@ -805,6 +852,12 @@ const charListEl = document.getElementById('char-list');
 const myThemesEl = document.getElementById('my-themes');
 const imgUrlEl   = document.getElementById('img-url');
 const imgHintEl  = document.getElementById('img-hint');
+const diffBarEl  = document.getElementById('difficulty');
+const customRowEl = document.getElementById('custom-row');
+const customHintEl = document.getElementById('custom-hint');
+const cwEl = document.getElementById('cw');
+const chEl = document.getElementById('ch');
+const cmEl = document.getElementById('cm');
 const cardListEl = document.getElementById('card-list');
 const cardHintEl = document.getElementById('card-hint');
 const historyPanelEl = document.getElementById('history-panel');
@@ -831,6 +884,8 @@ function loadState() {
     const s = JSON.parse(localStorage.getItem(STATS_KEY) || '{}');
     if (s.stats) stats = Object.assign(stats, s.stats);
     if (s.aiStats) aiStats = Object.assign(aiStats, s.aiStats);
+    // 老版本的"最佳用时"是单个数字（那时只有 9×9），迁移成按难度分开存
+    if (typeof stats.bestTime === 'number') stats.bestTime = { beginner: stats.bestTime };
   } catch (e) { /* 读不出来就用默认值 */ }
   try {
     const t = JSON.parse(localStorage.getItem(THEME_KEY) || '{}');
@@ -1166,23 +1221,35 @@ function fmt3(n) {
   return String(n).padStart(3, '0');
 }
 
-function newBoard() {
-  game = newGame(COLS, ROWS, MINES, mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0));
+function newBoard(key) {
+  if (key) levelKey = key;
+  const L = LEVELS[levelKey];
+  game = newGame(L.cols, L.rows, L.mines, mulberry32((Date.now() ^ (Math.random() * 1e9)) >>> 0));
   seconds = 0;
   settled = false;
   stopTimer();
   aiPauseUntil = 0;
   buildCells();
+  fitCell();
   faceEl.textContent = '🙂';
   timerEl.textContent = '000';
   render();
 }
 
+// 高级是 30 列，窄屏上会超出窗口，所以按可用宽度自动缩放格子大小
+function fitCell() {
+  if (!game) return;
+  const vw = (typeof window !== 'undefined' && window.innerWidth) ? window.innerWidth : 900;
+  const avail = Math.max(240, Math.min(vw - 56, 980));
+  const size = Math.max(14, Math.min(26, Math.floor(avail / game.cols)));
+  document.documentElement.style.setProperty('--cell', size + 'px');
+}
+
 function buildCells() {
-  boardEl.style.gridTemplateColumns = 'repeat(' + COLS + ', var(--cell))';
+  boardEl.style.gridTemplateColumns = 'repeat(' + game.cols + ', var(--cell))';
   boardEl.innerHTML = '';
   cellEls = [];
-  for (let i = 0; i < COLS * ROWS; i++) {
+  for (let i = 0; i < game.cols * game.rows; i++) {
     const d = document.createElement('div');
     d.className = 'cell';
     d.dataset.i = i;
@@ -1224,13 +1291,15 @@ function render() {
 
 function renderStats() {
   const rate = stats.games ? Math.round(stats.wins / stats.games * 100) : 0;
+  const best = (stats.bestTime && typeof stats.bestTime === 'object') ? stats.bestTime[levelKey] : null;
   const items = [
     ['本局得分', currentScore()],
+    ['难度', LEVELS[levelKey].name],
     ['局数', stats.games],
     ['胜场', stats.wins],
     ['胜率', rate + '%'],
     ['最高分', stats.bestScore],
-    ['最佳用时', stats.bestTime === null ? '--' : stats.bestTime + ' 秒'],
+    ['本难度最佳用时', best === undefined || best === null ? '--' : best + ' 秒'],
     ['AI 演示局数', aiStats.games],
     ['AI 胜场', aiStats.wins],
     ['AI 最长连胜', aiStats.bestStreak]
@@ -1252,7 +1321,8 @@ function renderHistory() {
     return '<div class="hist-row">' +
       '<span class="hist-no">' + (h.length - i) + '</span>' +
       '<span class="hist-res ' + (g.win ? 'win' : 'lose') + '">' + (g.win ? '通关' : '踩雷') + '</span>' +
-      '<span class="hist-meta">' + when + '　用时 ' + g.sec + ' 秒　得分 ' + g.score + '</span>' +
+      '<span class="hist-meta">' + (g.lv || '') + ' ' + (g.size || '') + '　' + when +
+      '　用时 ' + g.sec + ' 秒　得分 ' + g.score + '</span>' +
       '</div>';
   }).join('');
 }
@@ -1267,11 +1337,14 @@ function renderAIRecent() {
   }).join(' ');
 }
 
+// 得分随难度缩放：基础分 = 雷数 × 100（初级 10 雷 = 1000 分，高级 99 雷 = 9900 分），每用 1 秒扣 10 分
+function baseScore() { return game ? game.mines * 100 : 1000; }
+
 // 本局的实时得分：赢下来的瞬间定格，踩雷则归零
 function currentScore() {
   if (!game) return 0;
   if (game.status === 'lost') return 0;
-  return Math.max(0, 1000 - seconds * 10);
+  return Math.max(0, baseScore() - seconds * 10);
 }
 
 function startTimer() {
@@ -1301,14 +1374,20 @@ function settleGame(byAI) {
     }
   } else {
     stats.games++;
-    const score = won ? Math.max(0, 1000 - seconds * 10) : 0;
-    // 每打完一局就追加一条记录，只保留最近 10 局
-    stats.history.push({ t: now, win: won, sec: seconds, score: score });
+    const score = won ? Math.max(0, baseScore() - seconds * 10) : 0;
+    // 每打完一局就追加一条记录，只保留最近 10 局（记下难度，方便回看）
+    stats.history.push({
+      t: now, win: won, sec: seconds, score: score,
+      lv: LEVELS[levelKey].name, size: game.cols + '×' + game.rows
+    });
     if (stats.history.length > 10) stats.history.shift();
     if (won) {
       stats.wins++;
       stats.bestScore = Math.max(stats.bestScore, score);
-      stats.bestTime = stats.bestTime === null ? seconds : Math.min(stats.bestTime, seconds);
+      // 最佳用时按难度分别记录，否则初级永远碾压高级
+      if (!stats.bestTime || typeof stats.bestTime !== 'object') stats.bestTime = {};
+      const t = stats.bestTime[levelKey];
+      stats.bestTime[levelKey] = (t === undefined) ? seconds : Math.min(t, seconds);
     }
   }
   saveState();
@@ -1375,7 +1454,7 @@ boardEl.addEventListener('touchmove', () => clearTimeout(pressTimer), { passive:
 
 function cellXY(el) {
   const i = Number(el.dataset.i);
-  return { x: i % COLS, y: (i / COLS) | 0 };
+  return { x: i % game.cols, y: (i / game.cols) | 0 };
 }
 
 /**
@@ -1414,7 +1493,10 @@ function startAI() {
   aiRunning = true;
   aiBtn.textContent = '⏸ 停止演示';
   aiBtn.classList.add('primary');
-  newBoard();
+  // AI 演示固定跑任务书要求的标准局（9×9、10 雷），这样"连续通关 2 局"才是可核对的
+  newBoard(AI_LEVEL);
+  setLevelButtons(AI_LEVEL);
+  customRowEl.classList.remove('open');
   // 注意：这里不清零连胜。连胜只会被"踩雷"打断，
   // 中途停下来再继续不算断，否则最长连胜永远涨不上去。
   render();
@@ -1449,7 +1531,7 @@ function aiTick() {
   if (game.status === 'ready') {
     // 开局第一下交给 AI 选边角
     const i = pickOpening(game);
-    reveal(game, i % COLS, (i / COLS) | 0);
+    reveal(game, i % game.cols, (i / game.cols) | 0);
     startTimer();
     render();
     aiWhyEl.textContent = 'AI：开局没有线索，先点边角位置。';
@@ -1458,7 +1540,7 @@ function aiTick() {
 
   const d = aiDecide(game);
   if (!d) return;
-  const x = d.cell % COLS, y = (d.cell / COLS) | 0;
+  const x = d.cell % game.cols, y = (d.cell / game.cols) | 0;
   const before = game.status;
   if (d.action === 'flag') toggleFlag(game, x, y);
   else reveal(game, x, y);
@@ -1490,6 +1572,54 @@ themeBtn.onclick = function () {
 };
 
 /* ---------- 角色主题面板的交互 ---------- */
+/* ---------- 难度选择 ---------- */
+function setLevelButtons(key) {
+  const kids = diffBarEl.children || [];
+  for (let i = 0; i < kids.length; i++) {
+    const b = kids[i];
+    if (b.dataset && b.dataset.diff) b.classList.toggle('on', b.dataset.diff === key);
+  }
+}
+
+diffBarEl.addEventListener('click', function (e) {
+  const b = e.target.closest('.diff-btn');
+  if (!b) return;
+  const key = b.dataset.diff;
+  if (key === 'custom') {
+    // 自定义先展开输入框，等点「用这些参数开新局」才真正开局
+    setLevelButtons('custom');
+    customRowEl.classList.add('open');
+    customHintEl.textContent = '宽 5-50，高 5-30；雷数最多留出 9 格安全区（第一下点击周围保证没有雷）。';
+    return;
+  }
+  customRowEl.classList.remove('open');
+  if (aiRunning) stopAI('AI 演示：已停止（切换了难度）');
+  newBoard(key);
+  setLevelButtons(key);
+});
+
+document.getElementById('btn-custom-start').onclick = function () {
+  const w = Math.floor(Number(cwEl.value));
+  const h = Math.floor(Number(chEl.value));
+  const m = Math.floor(Number(cmEl.value));
+  if (!(w >= 5 && w <= 50)) { customHintEl.textContent = '宽度请填 5 到 50 之间的整数。'; return; }
+  if (!(h >= 5 && h <= 30)) { customHintEl.textContent = '高度请填 5 到 30 之间的整数。'; return; }
+  if (!(m >= 1 && m <= w * h - 9)) {
+    customHintEl.textContent = '雷数要在 1 到 ' + (w * h - 9) + ' 之间（第一下点击周围 9 格保证安全，要留出来）。';
+    return;
+  }
+  LEVELS.custom = { name: '自定义', cols: w, rows: h, mines: m };
+  if (aiRunning) stopAI('AI 演示：已停止（切换了难度）');
+  newBoard('custom');
+  setLevelButtons('custom');
+  customHintEl.textContent = '已开局：' + w + '×' + h + '，' + m + ' 颗雷。';
+};
+
+// 窗口大小变化时重新计算格子大小（高级 30 列需要）
+if (typeof window !== 'undefined' && window.addEventListener) {
+  window.addEventListener('resize', function () { fitCell(); });
+}
+
 document.getElementById('btn-chars').onclick = function () {
   panelEl.classList.toggle('open');
 };

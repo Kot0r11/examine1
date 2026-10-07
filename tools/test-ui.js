@@ -226,6 +226,47 @@ check('这一局被记入 AI 战绩', api.stats.ai.games >= 1 && api.stats.ai.re
       'AI局数=' + api.stats.ai.games + ' 最近战绩=' + api.stats.ai.recent.join(''));
 api.stopAI();
 
+/* 12) 难度选择：初级 / 中级 / 高级 / 自定义 */
+const diffBar = byId['difficulty'];
+function clickDiff(key) {
+  const b = makeEl('button');
+  b.dataset.diff = key;
+  fire(diffBar, 'click', { target: b });
+}
+
+clickDiff('intermediate');
+check('切到中级：16×16、40 雷',
+      api.game.cols === 16 && api.game.rows === 16 && api.game.mines === 40,
+      api.game.cols + '×' + api.game.rows + ' / ' + api.game.mines + ' 雷');
+
+clickDiff('expert');
+check('切到高级：30×16、99 雷',
+      api.game.cols === 30 && api.game.rows === 16 && api.game.mines === 99,
+      api.game.cols + '×' + api.game.rows + ' / ' + api.game.mines + ' 雷');
+
+clickDiff('custom');
+check('点「自定义」只展开输入框，不立刻开新局', api.game.cols === 30);
+
+byId['cw'].value = '10';
+byId['ch'].value = '10';
+byId['cm'].value = '99';           // 非法：10×10 最多放 91 颗（要留 9 格安全区）
+byId['btn-custom-start'].onclick();
+check('自定义：雷数超上限时不开局并给出提示',
+      api.game.cols === 30 && String(byId['custom-hint'].textContent).indexOf('雷数要在') >= 0,
+      String(byId['custom-hint'].textContent));
+
+byId['cm'].value = '20';
+byId['btn-custom-start'].onclick();
+check('自定义：参数合法时能开局（10×10、20 雷）',
+      api.game.cols === 10 && api.game.rows === 10 && api.game.mines === 20,
+      api.game.cols + '×' + api.game.rows + ' / ' + api.game.mines + ' 雷');
+
+api.startAI();
+check('AI 演示自动切回任务书要求的初级标准局（9×9、10 雷）',
+      api.game.cols === 9 && api.game.rows === 9 && api.game.mines === 10,
+      api.game.cols + '×' + api.game.rows + ' / ' + api.game.mines + ' 雷');
+api.stopAI();
+
 console.log('');
 console.log('结果：通过 ' + pass + ' 项，失败 ' + fail + ' 项');
 process.exit(fail ? 1 : 0);
